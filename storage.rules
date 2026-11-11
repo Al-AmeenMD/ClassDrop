@@ -1,0 +1,45 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && firestore.exists(/databases/(default)/documents/admins/$(request.auth.uid));
+    }
+
+    function isValidMimeType(contentType) {
+      return contentType in [
+        'application/pdf',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+        'text/csv',
+        'text/plain',
+        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+        'application/zip',
+        'application/x-zip-compressed',
+        'image/png',
+        'image/jpeg'
+      ];
+    }
+
+    match /materials/{resourceId}/{fileName} {
+      // Direct public read is strictly blocked. Downloads are mediated via Cloud Function signed URLs.
+      allow read: if isAdmin();
+
+      // Uploads restricted to authenticated admins, <= 50 MB, permitted MIME types
+      allow create: if isAdmin()
+                    && resource == null
+                    && request.resource.size > 0
+                    && request.resource.size <= 52428800
+                    && isValidMimeType(request.resource.contentType);
+
+      // Direct client updates and deletions are blocked (deletions handled via deleteResource Cloud Function)
+      allow update: if false;
+      allow delete: if false;
+    }
+  }
+}
+
