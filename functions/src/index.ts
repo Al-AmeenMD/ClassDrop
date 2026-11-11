@@ -11,9 +11,3 @@ setGlobalOptions({
  * ClassDrop Cloud Functions Foundation
  * Business logic (download gateway, deletion handler) will be implemented in subsequent phases.
  */
-export const healthCheck = {
-  status: "initialized",
-  runtime: "nodejs22",
-  version: "1.0.0",
-};
-
