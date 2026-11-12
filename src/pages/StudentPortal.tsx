@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import {
   collection,
   doc,
@@ -21,16 +21,31 @@ import {
   X,
   LogIn,
   RotateCcw,
+  Presentation,
 } from "lucide-react";
 import { db } from "../lib/firebase";
 import { PublicResource, ClassroomSettings } from "../types/database";
 import { formatFileSize, formatDisplayDate } from "../utils/fileValidation";
+import { ProjectorView } from "../components/student/ProjectorView";
 
 export const StudentPortal: React.FC = () => {
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+
   const [resources, setResources] = useState<PublicResource[]>([]);
   const [classroomSettings, setClassroomSettings] = useState<ClassroomSettings | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+
+  // Projector Presentation Mode State
+  const [isProjectorMode, setIsProjectorMode] = useState<boolean>(() => {
+    return (
+      searchParams.get("mode") === "projector" ||
+      searchParams.get("projector") === "true"
+    );
+  });
+  const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
 
   // Search & Filter State
   const [searchQuery, setSearchQuery] = useState("");
@@ -39,6 +54,88 @@ export const StudentPortal: React.FC = () => {
   // Download Action State
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+
+  // Fullscreen and Presentation Mode Controls
+  const handleEnterProjectorMode = async () => {
+    setIsProjectorMode(true);
+    try {
+      if (document.documentElement.requestFullscreen) {
+        await document.documentElement.requestFullscreen();
+      }
+    } catch (err) {
+      console.warn(
+        "Fullscreen permission unavailable or denied; operating in windowed presentation mode:",
+        err
+      );
+    }
+  };
+
+  const handleExitProjectorMode = useCallback(async () => {
+    setIsProjectorMode(false);
+
+    // Clean mode and projector query parameters while preserving unrelated parameters and hash
+    const currentParams = new URLSearchParams(location.search);
+    if (currentParams.has("mode") || currentParams.has("projector")) {
+      currentParams.delete("mode");
+      currentParams.delete("projector");
+      const searchStr = currentParams.toString() ? `?${currentParams.toString()}` : "";
+      navigate(
+        {
+          pathname: location.pathname,
+          search: searchStr,
+          hash: location.hash,
+        },
+        { replace: true }
+      );
+    }
+
+    try {
+      if (document.fullscreenElement && document.exitFullscreen) {
+        await document.exitFullscreen();
+      }
+    } catch (err) {
+      console.warn("Error exiting fullscreen:", err);
+    }
+  }, [location.pathname, location.search, location.hash, navigate]);
+
+  const handleToggleFullscreen = async () => {
+    try {
+      if (!document.fullscreenElement) {
+        if (document.documentElement.requestFullscreen) {
+          await document.documentElement.requestFullscreen();
+        }
+      } else {
+        if (document.exitFullscreen) {
+          await document.exitFullscreen();
+        }
+      }
+    } catch (err) {
+      console.warn("Fullscreen toggle failed:", err);
+    }
+  };
+
+  // Synchronize Escape key & Fullscreen change events
+  useEffect(() => {
+    const handleFullscreenChange = () => {
+      // Accurately reflect document.fullscreenElement without terminating Projector Mode
+      setIsFullscreen(Boolean(document.fullscreenElement));
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && isProjectorMode) {
+        e.preventDefault();
+        handleExitProjectorMode();
+      }
+    };
+
+    document.addEventListener("fullscreenchange", handleFullscreenChange);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("fullscreenchange", handleFullscreenChange);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [isProjectorMode, handleExitProjectorMode]);
 
   // Real-time Firestore subscriptions for classroom info and public resources
   const subscribeToData = useCallback(() => {
@@ -220,6 +317,27 @@ export const StudentPortal: React.FC = () => {
     }
   };
 
+  // Render Projector Presentation Mode if active
+  if (isProjectorMode) {
+    return (
+      <ProjectorView
+        classroomSettings={classroomSettings}
+        resources={filteredResources}
+        totalPublishedCount={resources.length}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+        selectedFormat={selectedFormat}
+        setSelectedFormat={setSelectedFormat}
+        availableFormats={availableFormats}
+        onDownload={handleDownload}
+        downloadingId={downloadingId}
+        onExit={handleExitProjectorMode}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={handleToggleFullscreen}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-brand-white flex flex-col justify-between">
       {/* Top Header */}
@@ -239,13 +357,25 @@ export const StudentPortal: React.FC = () => {
             </div>
           </div>
 
-          <Link
-            to="/login"
-            className="inline-flex items-center text-xs font-medium text-brand-slate hover:text-brand-dark-navy bg-brand-white hover:bg-brand-off-white border border-brand-border px-3 py-1.5 rounded transition-colors"
-          >
-            <LogIn className="w-3.5 h-3.5 mr-1.5 text-brand-slate" />
-            Facilitator Login
-          </Link>
+          <div className="flex items-center space-x-2.5">
+            <button
+              type="button"
+              onClick={handleEnterProjectorMode}
+              className="inline-flex items-center text-xs font-semibold text-brand-dark-navy bg-brand-white hover:bg-brand-off-white border border-brand-border px-3 py-1.5 rounded-md transition-colors shadow-xs"
+              title="Launch presentation-friendly Projector Mode"
+            >
+              <Presentation className="w-3.5 h-3.5 mr-1.5 text-brand-royal-blue" />
+              Projector Mode
+            </button>
+
+            <Link
+              to="/login"
+              className="inline-flex items-center text-xs font-medium text-brand-slate hover:text-brand-dark-navy bg-brand-white hover:bg-brand-off-white border border-brand-border px-3 py-1.5 rounded-md transition-colors"
+            >
+              <LogIn className="w-3.5 h-3.5 mr-1.5 text-brand-slate" />
+              Facilitator Login
+            </Link>
+          </div>
         </div>
       </header>
 

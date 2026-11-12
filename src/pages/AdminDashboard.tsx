@@ -35,12 +35,14 @@ import { formatFileSize, formatDisplayDate } from "../utils/fileValidation";
 import { FileUploadModal } from "../components/admin/FileUploadModal";
 import { EditResourceModal } from "../components/admin/EditResourceModal";
 import { DeleteConfirmationModal } from "../components/admin/DeleteConfirmationModal";
+import { ClassroomSharingSection } from "../components/admin/ClassroomSharingSection";
 
 export const AdminDashboard: React.FC = () => {
   const { user, logout } = useAuth();
   const [resources, setResources] = useState<Resource[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [classroomTitle, setClassroomTitle] = useState<string>("Classroom Learning Materials");
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState("");
@@ -80,7 +82,7 @@ export const AdminDashboard: React.FC = () => {
 
     const resourcesQuery = query(collection(db, "resources"), orderBy("createdAt", "desc"));
 
-    const unsubscribe = onSnapshot(
+    const unsubscribeResources = onSnapshot(
       resourcesQuery,
       (snapshot) => {
         const items: Resource[] = [];
@@ -100,7 +102,27 @@ export const AdminDashboard: React.FC = () => {
       }
     );
 
-    return () => unsubscribe();
+    // Read public classroom title for sharing card
+    const classroomDocRef = doc(db, "settings", "classroom");
+    const unsubscribeSettings = onSnapshot(
+      classroomDocRef,
+      (docSnap) => {
+        if (docSnap.exists()) {
+          const data = docSnap.data();
+          if (data.title) {
+            setClassroomTitle(data.title);
+          }
+        }
+      },
+      (err) => {
+        console.warn("Could not read classroom settings in admin dashboard:", err);
+      }
+    );
+
+    return () => {
+      unsubscribeResources();
+      unsubscribeSettings();
+    };
   }, []);
 
   // Filtered resources computation
@@ -258,11 +280,10 @@ export const AdminDashboard: React.FC = () => {
         {notification && (
           <div
             role="status"
-            className={`mb-6 p-3.5 rounded-md border text-xs flex items-center justify-between shadow-sm transition-all ${
-              notification.type === "success"
+            className={`mb-6 p-3.5 rounded-md border text-xs flex items-center justify-between shadow-sm transition-all ${notification.type === "success"
                 ? "bg-green-50 border-green-200 text-green-800"
                 : "bg-red-50 border-red-200 text-red-800"
-            }`}
+              }`}
           >
             <div className="flex items-center space-x-2">
               {notification.type === "success" ? (
@@ -341,37 +362,37 @@ export const AdminDashboard: React.FC = () => {
           </div>
         </div>
 
+        {/* Classroom Sharing & Student Access Section */}
+        <ClassroomSharingSection classroomTitle={classroomTitle} />
+
         {/* Filter and Search Bar */}
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
           {/* Status Tabs */}
           <div className="flex items-center p-1 bg-brand-off-white border border-brand-border rounded-md text-xs font-medium self-start sm:self-auto">
             <button
               onClick={() => setStatusFilter("all")}
-              className={`px-3 py-1 rounded transition-colors ${
-                statusFilter === "all"
+              className={`px-3 py-1 rounded transition-colors ${statusFilter === "all"
                   ? "bg-brand-white text-brand-dark-navy shadow-xs font-semibold"
                   : "text-brand-slate hover:text-brand-dark-navy"
-              }`}
+                }`}
             >
               All ({totalCount})
             </button>
             <button
               onClick={() => setStatusFilter("published")}
-              className={`px-3 py-1 rounded transition-colors ${
-                statusFilter === "published"
+              className={`px-3 py-1 rounded transition-colors ${statusFilter === "published"
                   ? "bg-brand-white text-green-700 shadow-xs font-semibold"
                   : "text-brand-slate hover:text-green-700"
-              }`}
+                }`}
             >
               Published ({publishedCount})
             </button>
             <button
               onClick={() => setStatusFilter("draft")}
-              className={`px-3 py-1 rounded transition-colors ${
-                statusFilter === "draft"
+              className={`px-3 py-1 rounded transition-colors ${statusFilter === "draft"
                   ? "bg-brand-white text-brand-dark-navy shadow-xs font-semibold"
                   : "text-brand-slate hover:text-brand-dark-navy"
-              }`}
+                }`}
             >
               Drafts ({draftCount})
             </button>
@@ -533,11 +554,10 @@ export const AdminDashboard: React.FC = () => {
                             <button
                               onClick={() => handleTogglePublish(item)}
                               disabled={isPending}
-                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors inline-flex items-center space-x-1 ${
-                                item.isPublished
+                              className={`px-2.5 py-1 rounded text-xs font-medium border transition-colors inline-flex items-center space-x-1 ${item.isPublished
                                   ? "border-brand-border text-brand-slate hover:text-brand-dark-navy hover:bg-brand-off-white"
                                   : "border-green-300 text-green-700 bg-green-50 hover:bg-green-100"
-                              } disabled:opacity-50`}
+                                } disabled:opacity-50`}
                               title={item.isPublished ? "Revoke student access" : "Publish to students"}
                             >
                               {isPending ? (
@@ -613,7 +633,7 @@ export const AdminDashboard: React.FC = () => {
       <footer className="border-t border-brand-border bg-brand-off-white px-6 py-4 mt-12">
         <div className="max-w-6xl mx-auto flex items-center justify-between text-xs text-brand-slate">
           <span>ClassDrop Administrator</span>
-          <span>Phase 3: File Management & Publishing</span>
+          <span>Phase 5: Sharing & Presentation</span>
         </div>
       </footer>
     </div>
