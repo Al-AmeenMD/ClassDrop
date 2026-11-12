@@ -2,6 +2,7 @@ import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
 import { getAuth, Auth } from "firebase/auth";
 import { getFirestore, Firestore } from "firebase/firestore";
 import { getStorage, FirebaseStorage } from "firebase/storage";
+import { getFunctions, Functions } from "firebase/functions";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -26,6 +27,7 @@ let app: FirebaseApp | null = null;
 let auth: Auth | null = null;
 let db: Firestore | null = null;
 let storage: FirebaseStorage | null = null;
+let functions: Functions | null = null;
 let initializationSucceeded = false;
 
 if (hasAllConfigKeys) {
@@ -34,6 +36,7 @@ if (hasAllConfigKeys) {
     auth = getAuth(app);
     db = getFirestore(app);
     storage = getStorage(app);
+    functions = getFunctions(app, "us-central1");
     initializationSucceeded = true;
   } catch (error) {
     console.error("Failed to initialize Firebase client services:", error);
@@ -41,6 +44,7 @@ if (hasAllConfigKeys) {
     auth = null;
     db = null;
     storage = null;
+    functions = null;
     initializationSucceeded = false;
   }
 } else {
@@ -51,4 +55,4 @@ if (hasAllConfigKeys) {
 
 // Reports true only when all six required variables are provided and initialization succeeded without error
 export const isFirebaseConfigured = initializationSucceeded;
-export { app, auth, db, storage };
+export { app, auth, db, storage, functions };

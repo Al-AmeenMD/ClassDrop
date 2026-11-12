@@ -16,9 +16,12 @@ service cloud.firestore {
       allow write: if docId == 'classroom' && isAdmin();
     }
 
-    // 2. Administrative Resources Collection: Strictly accessible only to authenticated admins
+    // 2. Administrative Resources Collection: Admin read, create, update; client deletion explicitly blocked
     match /resources/{resourceId} {
-      allow read, write: if isAdmin();
+      allow read: if isAdmin();
+      allow create: if isAdmin();
+      allow update: if isAdmin();
+      allow delete: if false;
     }
 
     // 3. Public Resources Collection: Public read, Admin write

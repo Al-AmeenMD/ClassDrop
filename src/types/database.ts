@@ -13,7 +13,7 @@ export interface Resource {
   storagePath: string;
   fileType: string;
   fileExtension: string;
-  fileSize: number;
+  fileSizeBytes: number;
   isPublished: boolean;
   downloadInitiations: number;
   createdAt: any;
