@@ -150,7 +150,7 @@ function rfc5987Encode(str: string): string {
   );
 }
 
-const downloadApp = express();
+export const downloadApp = express();
 downloadApp.disable("x-powered-by");
 
 const handleDownloadRequest = async (req: Request, res: Response): Promise<void> => {
